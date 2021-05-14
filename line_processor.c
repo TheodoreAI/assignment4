@@ -47,6 +47,8 @@ pthread_cond_t full_1 = PTHREAD_COND_INITIALIZER;
 
 
 
+
+
 // Buffer 2, shared resource between line separator thread and the output thread (adding the plus sign thread will start HERE)
 
 char buffer_2[SIZE];
