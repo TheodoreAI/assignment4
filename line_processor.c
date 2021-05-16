@@ -35,7 +35,7 @@ const char *stop = "STOP\n";
 
 
 // Buffer 1, shared resource between input thread and line separator thread
-char buffer_1[INPUT_LINES_SIZE][SIZE];
+char buffer_1[SIZE];
 // Number of lines in the buffer
 int count_1 = 0;
 // index where input thread will put the next item
@@ -65,7 +65,7 @@ pthread_mutex_t mutex_2 = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t full_2 = PTHREAD_COND_INITIALIZER;
 
 // buffer 3, shared resource between line plus sign thread and output thread
-char buffer_3[INPUT_LINES_SIZE][SIZE];
+char buffer_3[SIZE];
 // Number of lines in the buffer
 int count_3 = 0;
 // index where the plus sign thread will put the next item
@@ -104,20 +104,20 @@ void print_num_lines(int counts){
 void put_buff_1(char buf_1[]){
     // lock the mutual exclusion code 
     pthread_mutex_lock(&mutex_1); 
-    // printf("[%s]", buf_1);
 
-    // place the string into the buffer at the right index
-    strcpy(buffer_1[prod_idx_1], buf_1);
+    // concatctenate the string into the buffer_2
+    strncat(buffer_1, buf_1, SIZE);
     count_1++;
     
     // increment the prod_idx
-    prod_idx_1 = prod_idx_1 + 1;
+    // prod_idx_1 = prod_idx_1 + 1;
 
     // signal to the consumer that the buffer_1 is no longer empty
     pthread_cond_signal(&full_1);
 
     // unlock the mutual exclusion code
     pthread_mutex_unlock(&mutex_1);
+  
 }
 
 /*
@@ -135,18 +135,20 @@ void *read_input(void *args){
     // There shouldn't be a risk of losing count because it gets restarted every time read_input() gets called
     // and it only gets called once.
     int count = 0; 
+    char input[SIZE];
 
     // Get the input to the buffer_1
     while(!flag_stop){
-     
+        
         // get the input from the file
-        fgets(buffer_1[count], SIZE, stdin);
-        if(strcmp(buffer_1[count], stop) == 0){
+
+        fgets(input, SIZE, stdin);
+        
+        if(strcmp(input, stop) == 0){
             flag_stop = true; // set the stopper when we reach the word STOP
         }else{
              // passing the text to the buffer unless it hits STOP
-            put_buff_1(buffer_1[count]);
-            
+            put_buff_1(input);
             count++;
         }
        
@@ -162,6 +164,7 @@ void *read_input(void *args){
 char *get_buff_1(){
     char *line_array;
     line_array = malloc(SIZE + 1);
+  
     // Lock the mutual exlusion before checking if the buffer_1 has data
     pthread_mutex_lock(&mutex_1);
     while(count_1 == 0)
@@ -169,9 +172,9 @@ char *get_buff_1(){
         // buffer is empty. wait for the producer to signal that the buffer has data
         pthread_cond_wait(&full_1, &mutex_1);
 
-    strcpy(line_array, buffer_1[con_idx_1]);
+    strncat(line_array, buffer_1, SIZE);
     // Increment the index from which the item will be picked up
-    con_idx_1 = con_idx_1 + 1;
+    // con_idx_1 = con_idx_1 + 1;
     // decrement the number of items in the buffer_1
     count_1--; // this will stop the program if there is no more inputs.
     // unlock the mutex
@@ -188,9 +191,9 @@ void put_buff_2(char arr[]){
     // Lock the mutex before putting the string into the buffer
     pthread_mutex_lock(&mutex_2);
     // Put the string in the buffer_2
-    strcpy(buffer_2, arr);
+    strncat(buffer_2, arr, SIZE);
     // Increment the index where the next string will be put.
-    prod_idx_2 = prod_idx_2 + 1;
+    // prod_idx_2 = prod_idx_2 + 1;
     count_2++; // increase the number of lines in buffer_2 by 1
     //signal to the consumer that buffer_2 is no longer empty
     pthread_cond_signal(&full_2);
@@ -210,28 +213,24 @@ void put_buff_2(char arr[]){
 void *line_separator(void *args){
     // set the array pointer so that I can free the malloc() from the get_buf_1() to avoid memory leaks.
     char *line_array;
-    char arr[SIZE*INPUT_LINES_SIZE];
-    // print_num_lines(count_1);
+    print_num_lines(count_1);
     // I need to call the get_buff_1() count_1 times since that's how many lines of string
     // are in buffer_1
-    // print_num_lines(count_1);
-    while(count_1 >= 0){
-      
+    
         line_array = get_buff_1();
-        strncat(arr, line_array, SIZE);
+        // print_buffer_array(line_array);
+      
         // Looping through the strings in the arr[] to find
         // places with newline characters and replace them with spaces.
         for (int i = 0; i<SIZE; i++){
-            if (arr[i] == '\n'){
-                arr[i] = ' ';
+            if (line_array[i] == '\n'){
+                line_array[i] = ' ';
                 
             }
         }
         // Now that the newlines have been removed, I must add the string to the second buffer_2
-        // print_buffer_array(arr);
-        put_buff_2(arr);
-       
-    }
+        // print_buffer_array(line_array);
+        put_buff_2(line_array);
     
     free(line_array);
     return NULL;
@@ -249,7 +248,7 @@ char *get_buff_2(){
     
     strcpy(plus_arr, buffer_2);
     // increment the index from which the item will be picked up
-    con_idx_2 = con_idx_2 + 1;
+    // con_idx_2 = con_idx_2 + 1;
     // decrement the number of items in the buffer_2
     count_2--;
     // unlock the mutex
@@ -258,23 +257,46 @@ char *get_buff_2(){
     return plus_arr;
 }
 
+void put_buff_3(char input3[]){
 
+    // Lock the mutex before putting the string into the buffer
+    pthread_mutex_lock(&mutex_3);
+    strncat(buffer_3, input3, SIZE);
+
+    // increase the number of lines in buffer_3
+    count_3++;
+    // signal condition that buffer_3 is full
+    pthread_cond_signal(&full_3);
+    // unlock the mutex_3
+    pthread_mutex_unlock(&mutex_3);
+
+    print_buffer_array(buffer_3);
+
+}
 
 
 void *plus_sign(void *args){
     // set the array pointer so that I can free the malloc() from the get_buf_2() to avoid memory leaks.
     char *plus_arr;
-    char arr3[SIZE*INPUT_LINES_SIZE];
-    while(count_2 >= 0){
+    char input3[SIZE];
+
+    
         plus_arr = get_buff_2();
-        strncat(arr3,plus_arr, SIZE);
         
-        // Looping through the string in the arr3[] to find 
+        
+        // Looping through the string in the plus_array to find 
         // places with the ++ and repace them with ^ (have to be next to each other).
-        // print_buffer_array(arr3);
-
-
-    }
+        int i, j;
+        for (i = 0; i<= SIZE; i++, j++){
+            if(plus_arr[i] == '+' && plus_arr[i+1] == '+'){
+                input3[j] = '^';
+                i++;
+            }else{
+                input3[j] = plus_arr[i];
+            }
+        }
+        // print_buffer_array(input3);
+        put_buff_3(input3);
 
     free(plus_arr);
     return NULL;
