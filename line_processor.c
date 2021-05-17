@@ -213,7 +213,7 @@ void put_buff_2(char arr[]){
 void *line_separator(void *args){
     // set the array pointer so that I can free the malloc() from the get_buf_1() to avoid memory leaks.
     char *line_array;
-    print_num_lines(count_1);
+   
     // I need to call the get_buff_1() count_1 times since that's how many lines of string
     // are in buffer_1
     
@@ -270,8 +270,6 @@ void put_buff_3(char input3[]){
     // unlock the mutex_3
     pthread_mutex_unlock(&mutex_3);
 
-    print_buffer_array(buffer_3);
-
 }
 
 
@@ -303,6 +301,62 @@ void *plus_sign(void *args){
 }
 
 
+char *get_buff_3(){
+    char *output_arr;
+    output_arr = malloc(SIZE+1);
+    // Lock the mutual exclusion before checking if the buffer_3 has data.
+    pthread_mutex_lock(&mutex_3);
+    while(count_3 == 0)
+        // buffer_3 is empty, wait for the produced to signal that the buffer_3 has data.
+        pthread_cond_wait(&full_3, &mutex_3);
+    strcpy(output_arr, buffer_3);
+    // decrememnt the number of items in the buffer_3
+    count_3--;
+    // unlock the mutex
+    pthread_mutex_unlock(&mutex_3);
+    // print_buffer_array(output_arr);
+    return output_arr;
+}
+
+
+/*
+    Function that the output thread will run.
+    Consume the string from the buffer shared with the plus sign thread
+    stdout string.
+*/
+
+
+void *write_output(void *args){
+    // I have to take care of freeing malloc() so I have to delcare the output_arr again here and free() at end.
+    char *output_arr;
+    char arr_eighty[80];
+    char input4[SIZE];
+    int idx = 0;
+
+    // I might need to make another put_buff_3() 
+   
+    output_arr = get_buff_3(); // get the buffer_3
+    // for (int i = 0; i < SIZE; i++){
+    //     fprintf(stdout, output_arr[i]);
+    // }
+    // strncpy(input4, output_arr, SIZE);
+    // loop the length of the output_arr
+    for(int i = 0; i <= strlen(output_arr); i++, idx++){
+        // save the characters on the input4 array and then once we hit 79 (gotta allow for the \0)
+        // output it
+        input4[idx] = output_arr[i];
+        if (idx == 79){
+            //  fprintf(stdout, "%.80s %d\n", input4, strlen(output_arr));
+             fprintf(stdout, "%.80s\n", input4);
+             idx = -1;
+             // there is a bug for output3.txt file writting
+        }
+    }
+    
+    free(output_arr);
+    return NULL;
+
+}
 // using the input example from the lecture on inputting files to producer/consumer programs.
 int main(int argc, char *argv[]){
     // This is from the unbounded three threads example from the lectures on conditional variable.
@@ -311,15 +365,14 @@ int main(int argc, char *argv[]){
     pthread_create(&input_t, NULL, read_input, NULL);
     pthread_create(&line_t, NULL, line_separator, NULL);
     pthread_create(&plus_sign_t, NULL, plus_sign, NULL);
-    // pthread_create(&output_t, NULL, write_output, NULL);
-
+    pthread_create(&output_t, NULL, write_output, NULL);
 
 
     // join the threads
     pthread_join(input_t, NULL);
     pthread_join(line_t, NULL);
     pthread_join(plus_sign_t, NULL);
-    // pthread_join(output_t, NULL);
+    pthread_join(output_t, NULL);
     return EXIT_SUCCESS;
 }
 
