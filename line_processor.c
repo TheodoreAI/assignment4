@@ -293,7 +293,7 @@ void *plus_sign(void *args){
                 input3[j] = plus_arr[i];
             }
         }
-        print_buffer_array(input3);
+        // print_buffer_array(input3);
         put_buff_3(input3);
 
     free(plus_arr);
@@ -347,6 +347,7 @@ void *write_output(void *args){
         input4[idx] = output_arr[i];
         if (idx == 79){
             //  fprintf(stdout, "%.80s %d\n", input4, strlen(output_arr));
+             fprintf(stdout, "%.80s\n", input4);
              idx = -1;
              // there is a bug for output3.txt file writting
         }
